@@ -1,4 +1,4 @@
-package database;
+package com.minibase;
 import java.util.*;
 public class Parser {
 

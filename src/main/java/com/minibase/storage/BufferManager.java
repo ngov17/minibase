@@ -12,21 +12,43 @@
 package com.minibase.storage;
 
 import java.util.*;
+import com.minibase.*;
 
+
+/**
+ * The buffer manager is implemented as a Singleton class, so every buffer manager instance contains the same buffer
+ */
 public class BufferManager {
+
+    /** the single instance of BufferManager **/
+    private static BufferManager bm = null;
 
     private int pool_size;  // total number of pages the buffer can hold
 
-    public Buffer buffer = new Buffer(pool_size);
+    private Buffer buffer = new Buffer(pool_size);
 
     /**
      * Constructor
-     *  Opens a buffer manager for a given filename
+     *  Opens a buffer manager for a given filename. Private because BufferManager is Singleton
      *
      * @param pool_size  number of pages the buffer can hold
      */
-    public BufferManager(int pool_size) {
+    private BufferManager(int pool_size) {
         this.pool_size = pool_size;
+    }
+
+    public static BufferManager BufferManager(int pool_size) {
+        // To ensure only one instance is created
+        if (bm == null)
+        {
+            bm = new BufferManager(pool_size);
+        }
+        return bm;
+    }
+
+    public Page pin(int page_index, String filename) {
+        int ind = pinPage(page_index, filename);
+        return this.buffer.get(ind).page;
     }
 
     /**
@@ -35,18 +57,17 @@ public class BufferManager {
      * @param page_index    the index of the page
      * @param filename
      */
-    public int pinPage(int page_index, String filename) {
+    private int pinPage(int page_index, String filename) {
         // check if page exists in buffer
         int ind = this.buffer.findPage(page_index, filename);
 
         if (ind == -1)  {
             // Page does not exist in buffer
             FileManager fm = new FileManager(filename);
-            if (!fm.exists) { fm.close(); return -1; }
+            if (!fm.exists) { return -1; }
             Page page = new Page();
             try {
                 fm.readPage(page, page_index);
-                fm.close();
                 ind = this.buffer.add(page, page_index, filename);
             } catch (Exception e) {
                 System.err.println(e);
@@ -77,9 +98,13 @@ public class BufferManager {
 
         FileManager fm = new FileManager(filename);
         fm.writePage(p, page_index);
-        fm.close();
 
         unPin(page_index, filename);
+    }
+
+    public Page createFile(String filename) {
+        int ind = loadNewFile(filename);
+        return this.buffer.get(ind).page;
     }
 
     /**
@@ -87,12 +112,13 @@ public class BufferManager {
      * @param filename
      * @return buffer index of page loaded
      */
-    public int loadNewFile(String filename) {
-        FileManager fm = new FileManager(filename);
+    private int loadNewFile(String filename) {
+        //FileManager fm = new FileManager(filename);
 
-        fm.createFile();
+        FileManager.createFile(filename);
 
-        fm.close();
+        //fm.close();
+
 
         return pinPage(0, filename);
     }
@@ -128,6 +154,9 @@ class Buffer {
 
     }
 
+    /** TODO: **/
+    /* 2 [] [0 1], [p1] [1], [p1] [0 1], [p1 p2] [0],  [p3 p2], [] -> deal with buffer replacement problems later.. */
+
     public PageTuple get(int ind) {
         return this.buffer.get(ind);
     }
@@ -151,7 +180,13 @@ class Buffer {
     }
 
     /**
-     * An LRU buffer replacement strategy based on replacement list
+     * An approximate LRU Buffer Replacement Strategy:
+     *          A list (this.replace) maintains a list of all buffers indices that can be replaced
+     *          Initially, all indices in the buffer are assumed to be available for replacement
+     *          Every time a page is pinned, it is removed from the replace list.
+     *          When it is unpinned, it is added back to the replace list
+     *          If the buffer needs to replace a page, it removes the page associated with the first buffer index
+     *              in the replace list
      * @param tuple  the PageTuple to insert (and replace with the first element)
      * @return  the buffer index of the inserted tuple, which is 0 always
      */
@@ -178,25 +213,35 @@ class PageTuple {
 
 class unitTestBuffer {
     public static void main(String[] args) {
-        BufferManager bm = new BufferManager(2);
-        int p_ind = bm.loadNewFile("test"); // should pin page
-        //int p_ind = bm.pinPage(0, "test");
-        Page p = bm.buffer.get(p_ind).page;
-        byte[] test_b = Util.intToByteArray(10561);
-        for (int i = 0; i < 4; i++) {
-            p.data[i] = test_b[i];
-            System.out.println(test_b[i]);
-        }
-        // should unpin page
-        bm.updatePage(0, "test");
-        System.out.println("-------");
-        // read page (eg: seq scan)
-        int y_ind = bm.pinPage(0, "test");
-        Page y = bm.buffer.get(y_ind).page;
-        for (int i = 0; i < 4; i++) {
-            System.out.println(y.data[i]);
-        }
-        bm.unPin(0, "test");
+        BufferManager bm = BufferManager.BufferManager(2);
+        switch (args[0]) {
+            case "create_copy":
+                System.out.println("Creating file test");
 
+                Page p = bm.createFile("test");
+                //bm.unPin(0, "test");
+                byte[] t = Util.intToByteArray(8908);
+                System.out.println("copying data to page");
+                for(int i = 0; i < 4; i++) {
+                    p.data[i] = t[i];
+                }
+                bm.updatePage(0, "test");
+                break;
+            case "test":
+                System.out.println("testing");
+                Page x = bm.pin(0, "test");
+
+                for(int i = 0; i < 4; i++) {
+                    System.out.println(x.data[i]);
+                }
+
+                t = Util.intToByteArray(11103);
+                System.out.println("copying data to page");
+                for(int i = 0; i < 4; i++) {
+                    x.data[i] = t[i];
+                    System.out.println(x.data[i]);
+                }
+                bm.updatePage(0, "test");
+        }
     }
 }

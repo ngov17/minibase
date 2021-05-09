@@ -1,4 +1,4 @@
-package database;
+package com.minibase;
 public class Node {
 
     int num_rows;

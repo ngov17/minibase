@@ -11,10 +11,9 @@
  */
 package com.minibase.storage;
 
-import java.io.IOException;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.File;
+import com.minibase.Util;
+
+import java.io.*;
 import java.util.*;
 
 class FileManager {
@@ -31,13 +30,6 @@ class FileManager {
 
     public boolean exists;
 
-    public void printPages() {
-        System.out.println(this.num_pages);
-        System.out.println(this.page_pointers.get(0));
-        System.out.println(this.file_end);
-    }
-
-
     /**
      * Constructor
      *  Opens a file manager for a given filename
@@ -49,16 +41,6 @@ class FileManager {
         this.file = new File(filename);
         this.exists = this.file.exists();
 
-        try {
-            /* Create a file if the file does not exist */
-            if (this.exists) {
-                /* load f_in and f_out */
-                this.f_in = new FileInputStream(this.file);
-                this.f_out = new FileOutputStream(this.file, exists);
-            }
-        } catch (Exception e) {
-            System.err.println(e);
-        }
 
         if (this.exists) readHeader();
 
@@ -83,12 +65,16 @@ class FileManager {
         }
 
         try {
-            this.f_in.getChannel().position(this.page_pointers.get(page_index));
-            this.f_in.read(page.data);
+            FileInputStream f_in = new FileInputStream(this.file);
+            f_in.getChannel().position(this.page_pointers.get(page_index));
+            f_in.read(page.data);
+            f_in.close();
 
         } catch (Exception e) {
             System.err.println(e);
         }
+
+
     }
 
 
@@ -106,9 +92,12 @@ class FileManager {
         }
 
         try {
-            this.f_out.getChannel().position(this.page_pointers.get(page_index));
-            this.f_out.write(page.data);
-            this.f_out.flush();
+            RandomAccessFile f_out = new RandomAccessFile(this.file, "rw");
+
+            f_out.getChannel().position(this.page_pointers.get(page_index));
+
+            f_out.write(page.data);
+            f_out.close();
 
         } catch (Exception e) {
             System.err.println(e);
@@ -124,7 +113,7 @@ class FileManager {
     public int allocatePage(int num_pages) {
 
         // update on disk
-        writeHeader(this.num_pages + num_pages);
+        writeHeader(this.num_pages + num_pages, this.file);
 
         // update in memory
         this.num_pages = this.num_pages + num_pages;
@@ -139,21 +128,20 @@ class FileManager {
      * Creates a file with one page (default)
      *
      */
-    public void createFile() {
+    public static void createFile(String filename) {
         try {
-            this.file.createNewFile();
+            File file = new File(ROOT_PATH + filename);
+            file.createNewFile();
             System.out.println("Created file");
-
-            this.f_in = new FileInputStream(this.file);
-            this.f_out = new FileOutputStream(this.file);
+            /* File created, load header and initial page onto file */
+            writeHeader(1, file);
 
         } catch (Exception e) {
             System.err.println(e);
         }
 
-        /* File created, load header and initial page onto file */
-        writeHeader(1);
-        readHeader();
+
+        //readHeader();
     }
 
     /**
@@ -198,15 +186,19 @@ class FileManager {
      *
      * @param num_pages
      */
-    private void writeHeader(int num_pages) {
+    private static void writeHeader(int num_pages, File f) {
         byte[] n_pages = Util.intToByteArray(num_pages);
+
 
 
         // write to file
         try {
-            this.f_out.getChannel().position(0);    // set position to start of file
-            this.f_out.write(n_pages);
-            this.f_out.flush();
+            System.out.println("Writing header...");
+            FileOutputStream f_out = new FileOutputStream(f);
+            f_out.getChannel().position(0);    // set position to start of file
+            f_out.write(n_pages);
+            f_out.flush();
+            f_out.close();
 
         } catch (Exception e) {
             System.err.println(e);
@@ -221,12 +213,16 @@ class FileManager {
 
         // read header
         try {
-            this.f_in.read(n_pages);
+            FileInputStream f_in = new FileInputStream(this.file);
+            f_in.read(n_pages);
+            f_in.close();
         } catch (Exception e) {
             System.err.println(e);
         }
 
         this.num_pages = Util.byteArrayToInt(n_pages);
+        System.out.println("NUMPAGES");
+        System.out.println(this.num_pages);
 
         updateFileEnd();
 
@@ -243,82 +239,8 @@ class FileManager {
     }
 }
 
-public class unitTestFile {
+class unitTestFile {
     public static void main(String[] args) {
-        FileManager test = new FileManager("test");
-        if (args[0].equals("load")) {
-            /* Raw Testing */
-
-            Page p = new Page();
-            System.out.println(test.getPageCount());
-
-
-            test.allocatePage(1);
-            System.out.println(test.getPageCount());
-            test.readPage(p, 1);
-            byte[] test_b = Util.intToByteArray(1561);
-            System.out.println("-1--");
-            for(int i = 0; i < 4; i++) {
-                System.out.println(p.data[i]);
-            }
-            for(int i = 0; i < 4; i++) {
-                p.data[i] = test_b[i];
-            }
-            System.out.println("-2--");
-            test.writePage(p, 2);
-            Page y = new Page();
-            test.readPage(y, 2);
-            for(int i = 0; i < 4; i++) {
-                System.out.println(y.data[i]);
-            }
-            System.out.println("--0-");
-            test.readPage(y, 0);
-            for(int i = 0; i < 4; i++) {
-                System.out.println(y.data[i]);
-            }
-
-            //test.printPages();
-            test.close();
-
-        } else if (args[0].equals("new")) {
-            /* Raw Testing */
-
-            Page p = new Page();
-            test.createFile();
-            System.out.println(test.getPageCount());
-
-
-            test.allocatePage(1);
-            System.out.println(test.getPageCount());
-            test.readPage(p, 1);
-            byte[] test_b = Util.intToByteArray(10561);
-            System.out.println("---");
-            for(int i = 0; i < 4; i++) {
-                System.out.println(test_b[i]);
-                p.data[i] = test_b[i];
-            }
-
-            System.out.println("-1--");
-            test.writePage(p, 1);
-            Page y = new Page();
-            test.readPage(y, 1);
-            for(int i = 0; i < 4; i++) {
-                System.out.println(y.data[i]);
-            }
-            System.out.println("--0-");
-            test.readPage(y, 0);
-            for(int i = 0; i < 4; i++) {
-                System.out.println(y.data[i]);
-            }
-
-            //test.printPages();
-            test.close();
-
-        } else if (args[0].equals("clear")) {
-            test.deleteFile();
-        } else {
-            System.out.println("invalid args");
-        }
 
     }
 }
