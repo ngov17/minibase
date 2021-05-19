@@ -22,6 +22,8 @@ import java.util.Arrays;
 
 public class Util {
 
+    public String[] operators = {"<", ">", "=", "!=", "<=", ">="};
+
     public static byte[] intToByteArray(int data) {
         return new byte[] {
                 (byte)((data >> 24) & 0xff),
@@ -95,6 +97,77 @@ public class Util {
                 throw new IllegalArgumentException("att_type must be int or text only");
         }
 
+    }
+
+    public static String decodeAttType(String att_type) {
+        switch (att_type) {
+            case "0":
+                return "int";
+            case "1":
+                return "text";
+            default:
+                throw new IllegalArgumentException("att_type must be '0' or text '1' ");
+        }
+
+    }
+
+    public static String[] objectArrayToStringArray(Object[] obj_arr) {
+        String[] res = new String[obj_arr.length];
+        for(int i = 0; i < obj_arr.length; i++) {
+            res[i] = (String) obj_arr[i];
+        }
+
+        return res;
+    }
+
+    public static boolean compare(Object l_hand, Object r_hand, String operator) {
+        if (l_hand instanceof String) {
+            String l = (String) l_hand;
+            String r = (String ) r_hand;
+            return compare(l, r, operator);
+        } else {
+            Integer l = (Integer) l_hand;
+            Integer r = (Integer) r_hand;
+            return compare(l, r, operator);
+        }
+    }
+
+    public static boolean compare(String l_hand, String r_hand, String operator) {
+
+        switch (operator) {
+            case "=":
+                return l_hand.equals(r_hand);
+            case "!=":
+                return !l_hand.equals(r_hand);
+            case ">":
+                return l_hand.compareTo(r_hand) > 0;
+            case "<":
+                return l_hand.compareTo(r_hand) < 0;
+            case ">=":
+                return l_hand.compareTo(r_hand) >= 0;
+            case "<=":
+                return l_hand.compareTo(r_hand) <= 0;
+        }
+        return false;
+    }
+
+    public static boolean compare(Integer l_hand, Integer r_hand, String operator) {
+
+        switch (operator) {
+            case "=":
+                return l_hand.equals(r_hand);
+            case "!=":
+                return !l_hand.equals(r_hand);
+            case ">":
+                return l_hand.compareTo(r_hand) > 0;
+            case "<":
+                return l_hand.compareTo(r_hand) < 0;
+            case ">=":
+                return l_hand.compareTo(r_hand) >= 0;
+            case "<=":
+                return l_hand.compareTo(r_hand) <= 0;
+        }
+        return false;
     }
 
 }

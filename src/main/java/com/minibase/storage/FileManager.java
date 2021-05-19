@@ -16,7 +16,7 @@ import com.minibase.Util;
 import java.io.*;
 import java.util.*;
 
-class FileManager {
+public class FileManager {
 
     /** INSTANCE VARIABLES **/
     private File file;
@@ -36,7 +36,7 @@ class FileManager {
      *
      * @param filename  the file to manage
      */
-    FileManager(String filename) {
+    public FileManager(String filename) {
         filename = ROOT_PATH + filename;
         this.file = new File(filename);
         this.exists = this.file.exists();
@@ -59,6 +59,7 @@ class FileManager {
      *                      the file pointer of the page in disk
      */
     public void readPage(Page page, int page_index) {
+
 
         if (page_index > this.num_pages) {
             throw new IndexOutOfBoundsException("invalid page index");
@@ -151,8 +152,8 @@ class FileManager {
         close();
         try {
             this.file.delete();
-            System.out.println("File Deleted, creating new FileManager with the new file will create a new " +
-                    "file with default contents");
+            //System.out.println("File Deleted, creating new FileManager with the new file will create a new " +
+                    //"file with default contents");
         } catch (Exception e) {
             System.err.println(e);
         }
@@ -221,8 +222,6 @@ class FileManager {
         }
 
         this.num_pages = Util.byteArrayToInt(n_pages);
-        System.out.println("NUMPAGES");
-        System.out.println(this.num_pages);
 
         updateFileEnd();
 

@@ -13,6 +13,7 @@ package com.minibase.storage;
 
 import java.util.*;
 import com.minibase.*;
+import com.minibase.access.Schema;
 
 
 /**
@@ -25,7 +26,7 @@ public class BufferManager {
 
     private int pool_size;  // total number of pages the buffer can hold
 
-    private Buffer buffer = new Buffer(pool_size);
+    private Buffer buffer;
 
     /**
      * Constructor
@@ -35,6 +36,7 @@ public class BufferManager {
      */
     private BufferManager(int pool_size) {
         this.pool_size = pool_size;
+        buffer = new Buffer(pool_size);
     }
 
     public static BufferManager BufferManager(int pool_size) {
@@ -107,31 +109,49 @@ public class BufferManager {
         return this.buffer.get(ind).page;
     }
 
+    public ArrayList<Schema> getSchemas() {
+        return new ArrayList<>(this.buffer.schemas.values());
+    }
+
+    public Schema getSchema(String table_name) {
+        return this.buffer.schemas.get(table_name);
+    }
+
+    public boolean attExists(String att, String table_name) {
+        return getSchema(table_name).attIndex(att) != -1 || att.equals("*");
+    }
+
+
+    /**
+     * loads schemas to buffer
+     */
+    public void loadSchemas(HashMap<String, Schema> schemas) {
+        this.buffer.schemas = schemas;
+    }
+
+
     /**
      * Creates a new file and loads initial page to the buffer and pins page
      * @param filename
      * @return buffer index of page loaded
      */
     private int loadNewFile(String filename) {
-        //FileManager fm = new FileManager(filename);
-
         FileManager.createFile(filename);
-
-        //fm.close();
-
-
         return pinPage(0, filename);
     }
 }
 
 /**
  * Represents a buffer, which is a list of PageTuples
+ * Also contains meta data information
  */
 class Buffer {
 
     private ArrayList<PageTuple> buffer = new ArrayList<PageTuple>();
 
     private ArrayList<Integer> replace = new ArrayList<Integer>();  // list of buffer indices that can be replaced
+
+    public HashMap<String, Schema> schemas = new HashMap<>();
 
 
     public int length;
@@ -146,10 +166,11 @@ class Buffer {
 
     public int add(Page p, int page_index, String filename) {
         PageTuple tuple = new PageTuple(p, page_index, filename);
-        /* If the buffer is full, use a buffer replacement strategy */
-        if (this.buffer.size() > this.length) return replace(tuple);
-        this.buffer.add(tuple);
 
+        /* If the buffer is full, use a buffer replacement strategy */
+        if (this.buffer.size() > this.length) {return replace(tuple);}
+
+        this.buffer.add(tuple);
         return buffer.size() - 1;
 
     }
@@ -172,6 +193,7 @@ class Buffer {
     }
 
     public void pin(int ind) {
+        //System.out.println("PIN");
         replace.remove(new Integer(ind));
     }
 

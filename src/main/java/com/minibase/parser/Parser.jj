@@ -1,0 +1,351 @@
+/*-------------------------------------------------------------------------
+ *
+ * Parser.jj
+ *  SQL Grammar
+ *
+ *
+ *
+ * IDENTIFICATION
+ *	  src/main/java/com/minibase/parser/Parser.jj
+ *
+ *-------------------------------------------------------------------------
+ */
+
+PARSER_BEGIN(Parser)
+package com.minibase.parser;
+
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+
+
+
+public class Parser {
+
+  /** Main entry point. */
+//  public static void main(String args[]) throws ParseException {
+//    Parser parser = new Parser(System.in);
+//    ASTCreate n = (ASTCreate) parser.Input();
+//    Schema s = n.getSchema();
+//    s.printSchema();
+//  }
+
+  /**
+  * Parses a String s
+* @return  an Abstract Syntax Tree
+*/
+  public static ASTNode parse(String s) throws ParseException {
+      InputStream i_stream = new ByteArrayInputStream(s.getBytes(StandardCharsets.UTF_8));
+      Parser parser = new Parser(i_stream);
+      ASTNode n = parser.Input();
+      return n;
+    }
+
+}
+
+
+PARSER_END(Parser)
+
+SKIP : {
+  " "
+| "\t"
+| "\n"
+| "\r"
+}
+
+// literals
+TOKEN: {
+    < l_int: ( ["0"-"9"] )+ >
+}
+
+// data types
+TOKEN: {
+    < d_INT: "int" | "INT" >
+    |
+    < d_TEXT: "text" | "TEXT" >
+}
+
+// Conditions:
+TOKEN: {
+    < operator: <eq> | <neq> | <g> | <l> | <ge> | <le> >
+    |
+    < eq: "=">
+    |
+    < neq: "!=">
+    |
+    < g: ">">
+    |
+    < l: "<">
+    |
+    < ge: ">=">
+    |
+    < le: "<=">
+}
+
+// SQL Keywords
+TOKEN : {
+  < K_CREATE: "CREATE" | "create">
+  |
+  <K_TABLE: "TABLE" | "table">
+  |
+  <K_INSERT: "INSERT" | "insert">
+  |
+  <K_INTO: "INTO" | "into">
+  |
+  <K_VALUES: "VALUES" | "values">
+  |
+  <K_SELECT: "SELECT" | "select">
+  |
+  <K_FROM: "FROM" | "from">
+  |
+  <K_WHERE: "WHERE" | "where">
+  |
+  <K_AND: "AND" | "and">
+  |
+  <K_OR: "OR" | "or">
+  |
+  <K_AS: "AS" | "as">
+}
+// delimiter tokens
+TOKEN :
+{
+    <SEMICOLON: ";"> |
+    <COMMA: ","> |
+    <EMPTY: "" >
+}
+
+/** Root production. */
+ASTNode Input() :
+{
+ ASTNode n;
+ }
+{
+  <EMPTY>
+  |
+  n = createTable() <SEMICOLON> {return n;}
+  |
+  n = insert() <SEMICOLON> {return n;}
+  |
+  n = select() <SEMICOLON> {return n;}
+}
+
+
+ASTNode createTable() :
+{
+
+    String table_name;
+    String err;
+    HashMap<String, String> table_props = new LinkedHashMap<>();// stores att_name -> att_value
+ }
+{
+    <K_CREATE> <K_TABLE> table_name=table_name() "(" (attribute(table_props)) * ")"
+    {
+
+    ASTCreate node = new ASTCreate(table_name, table_props);
+    err = Validator.validateCreate(node.getSchema());
+    if (!err.equals("")) {throw new ParseException(err); }
+    return node;
+}
+}
+
+ASTNode insert():
+{
+    ArrayList<String> vals = new ArrayList<>();
+    String table_name;
+ }
+{
+    <K_INSERT> <K_INTO> table_name=table_name() <K_VALUES> "(" (value(vals)) * ")"
+    {
+        Object[] values = vals.toArray();
+        String err = Validator.validateInsert(values, table_name);
+        if (!err.equals("")) {throw new ParseException(err); }
+        ASTInsert insert = new ASTInsert(values, table_name);
+        return insert;
+    }
+}
+
+ASTNode select():
+{
+    ArrayList<String> att_list = new ArrayList<>();
+    ArrayList<String> table_list = new ArrayList<>();
+    ASTNode sel;
+    Condition c = new Condition();
+    sel = new ASTSelect(att_list, table_list, c);
+    // ( list(table_list) | "(" sel_child=select() ")" )
+}
+{
+    <K_SELECT> list(att_list) <K_FROM> from_list(table_list, sel)  [<K_WHERE> conditional_expr(c) ]
+    {
+          String[] err = new String[1];
+          err[0] = Validator.validateTable(table_list);
+          if (!err[0].equals("")) throw new ParseException(err[0]);
+          Validator.validateSelectAtts((ASTSelect) sel, err);
+          if (!err[0].equals("")) throw new ParseException(err[0]);
+          return sel;
+     }
+}
+
+void from_list(ArrayList<String> table_list, ASTNode sel):
+{
+}
+{
+    from_elem(table_list, sel) [from_list(table_list, sel)]
+
+}
+
+void from_elem(ArrayList<String> table_list, ASTNode sel):
+{
+}
+{
+    (value(table_list) | sel_elem(sel) ) [from_list(table_list, sel)]
+}
+
+void sel_elem(ASTNode sel):{String alias; ASTNode sel_child = null; ASTSelect sel_n = (ASTSelect) sel;}
+{
+    "(" sel_child=select() ")" <K_AS> alias=table_name() [<COMMA>]
+    {if (sel_child != null) { sel_n.addChild(sel_child, alias);}}
+}
+
+void condition(Condition c):
+{
+    String l_hand;
+    String r_hand;
+    String operator;
+    Condition l = new Condition();
+    Condition r = new Condition();
+    Token t = null;
+
+}
+
+{
+    l_hand=val() operator=operator() r_hand=val() [(t=<K_AND> | t=<K_OR> ) condition(r)]
+
+    {
+        if(t != null) {
+            l.initCond(l_hand, r_hand, operator);
+            c.setCond(l, r, t.image);
+        } else {
+            c.initCond(l_hand, r_hand, operator);
+        }
+
+    }
+    |
+    "(" conditional_expr(c) ")"
+
+
+}
+
+void conditional_expr(Condition c):
+{Token t = null; c.left_cond = new Condition(); c.right_cond = new Condition();}
+{
+        condition(c.left_cond) [(t=<K_AND> | t=<K_OR> ) conditional_expr(c.right_cond)]
+        {if(t != null) c.child_relation = t.image;}
+}
+
+String table_name():
+{
+    Token t_name;
+}
+{
+    t_name = <IDENTIFIER>
+    {
+    return t_name.image;
+    }
+
+}
+
+void list(ArrayList<String> list):
+{
+}
+{
+    LOOKAHEAD(3)
+    value(list) list(list)
+    |
+    value(list)
+}
+
+
+void value(ArrayList<String> vals):
+{
+    String t;
+}
+{
+    LOOKAHEAD(val() <COMMA>)
+    t=val() <COMMA>
+    {vals.add(t);}
+
+    |
+
+    t=val()
+    {vals.add(t);}
+}
+
+String operator(): {Token t;}
+{
+    t=<operator> {return t.image;}
+
+}
+
+String val(): {Token t;}
+{
+    t=<IDENTIFIER> {return t.image;}
+    |
+    t=<l_int> {return t.image;}
+}
+
+
+void attribute(HashMap<String, String> table_prop):
+{
+    String att_name;
+    String att_type;
+ }
+{
+    LOOKAHEAD(3)
+    att_name=attribute_name() att_type=attribute_type() <COMMA>
+    {table_prop.put(att_name, att_type);}
+
+    |
+
+    att_name=attribute_name() att_type=attribute_type()
+    {table_prop.put(att_name, att_type);}
+
+}
+
+String attribute_name():
+{
+    Token att_name;
+}
+{
+
+    att_name = <IDENTIFIER>
+    {return att_name.image;}
+
+}
+
+String attribute_type():
+{
+    Token att_type;
+}
+{
+
+    att_type = <d_INT>
+
+    {return att_type.image;}
+
+    |
+
+    att_type = <d_TEXT>
+
+    {return att_type.image;}
+
+}
+
+TOKEN : /* IDENTIFIERS */
+{
+  < IDENTIFIER: (<LETTER>|<DIGIT>) (<LETTER>|<DIGIT>)* >
+|
+  < #LETTER: ["_","a"-"z","A"-"Z", "*", ".", "@"] >
+|
+  < #DIGIT: ["0"-"9"] >
+}

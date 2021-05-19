@@ -33,7 +33,7 @@ class HFPage {
     private int f_upper;
     private ArrayList<RID> l_ptrs;
 
-    private static int curr_ptr = 0;
+    private int curr_ptr = 0;
 
     public HFPage(Page page) {
         this.page = page;
@@ -62,11 +62,10 @@ class HFPage {
 
     }
 
-    public RID insertRecord(Record rec) {
+    RID insertRecord(Record rec) {
         byte[] serialized_record = Util.objectToByteArray(rec);
 
         int len = serialized_record.length - 1;
-        System.out.println(serialized_record.length);
         for(int i = this.f_upper; i > this.f_upper - serialized_record.length; i--) {
 
             this.page.data[i] = serialized_record[len];
@@ -84,24 +83,38 @@ class HFPage {
         return rid;
     }
 
-    public Record firstRecord() {
+    Record firstRecord() {
         RID rid = this.l_ptrs.get(0);
         curr_ptr = 1;
         return get(rid);
     }
 
-    public Record nextRecord() {
-        if (curr_ptr == this.l_ptrs.size()) {curr_ptr = 0; return null;}
+    Record nextRecord() {
+        if (curr_ptr >= this.l_ptrs.size()) {return null;}
 
         RID rid = this.l_ptrs.get(curr_ptr);
         curr_ptr++;
         return get(rid);
     }
 
-    public Record get(RID rid) {
-        System.out.println(rid.offset);
-        System.out.println(rid.length);
+    void reset() {
+        curr_ptr = 0;
+    }
+
+    boolean hasNext() {
+        if (curr_ptr >= this.l_ptrs.size()) return false; else return true;
+    }
+
+    Record get(RID rid) {
         return (Record) Util.byteArrayToObject(read(rid.offset, rid.length));
+    }
+
+    /**
+     *
+     * @return true if no records in page, false otherwise
+     */
+    boolean isEmpty() {
+        return this.l_ptrs.isEmpty();
     }
 
     private byte[] read(int offset, int length) {
@@ -130,11 +143,6 @@ class HFPage {
         this.f_upper = Util.byteArrayToInt(Arrays.copyOfRange(this.page.data, 8, 12));
         this.l_ptrs = (ArrayList<RID>) Util.byteArrayToObject(readLinePointer());
 
-        // testing
-        System.out.println(num_entries);
-        System.out.println(f_lower);
-        System.out.println(f_upper);
-        System.out.println(l_ptrs.size());
 
     }
 
