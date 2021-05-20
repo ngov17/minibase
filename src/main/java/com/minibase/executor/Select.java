@@ -18,6 +18,7 @@ import com.minibase.executor.iterators.SelectionIterator;
 import com.minibase.executor.iterators.SeqScanIterator;
 import com.minibase.parser.ASTNode;
 import com.minibase.parser.ASTSelect;
+import com.minibase.storage.BufferManager;
 
 import java.util.ArrayList;
 
@@ -35,6 +36,8 @@ public class Select implements Plan {
         if (!sel.isEmpty()) {
 
             for (String att: select.schema.keySet()) {
+                BufferManager bm = BufferManager.BufferManager(4);
+                att = bm.getSchema(select.schema.get(att)).qualifiedName(att);
                 System.out.print(att);
                 System.out.print(" | ");
             }
@@ -42,7 +45,7 @@ public class Select implements Plan {
             System.out.println("-------");
             while (sel.hasNext()) {
                 Record r = sel.getNext();
-                if (r == null) { break;};
+                if (r == null) {System.out.println("here");break;};
 
                 for (Object o : r.values){
                     System.out.print(o);
@@ -68,7 +71,8 @@ public class Select implements Plan {
 
                 iterators.add(it);
             }
-            SelectionIterator sel = new SelectionIterator(iterators, select.from_list, select);
+            Iterator sel = new SelectionIterator(iterators, select.from_list, select);
+
             return sel;
         } else {
             ArrayList<String> tables = new ArrayList<>();

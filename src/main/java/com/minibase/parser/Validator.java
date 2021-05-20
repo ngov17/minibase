@@ -70,7 +70,8 @@ public class Validator {
         if (sel.att_list.get(0).equals("*")) {
             for (String table: sel.from_list) {
                 for (String att: bm.getSchema(table).getAttNames()) {
-                    sel.schema.put(att, table);
+                    if (sel.schema.containsKey(att)) {sel.schema.put(bm.getSchema(table).qualifiedName(att), table); }
+                    else sel.schema.put(att, table);
                     sel.types.put(att, bm.getSchema(table).attType(att));
 
                 }
@@ -125,6 +126,7 @@ public class Validator {
                 if (atts.size() != 0) {
                     err[0] = "Col " + atts.get(0) + " does not exist";
                 } else {
+                    System.out.println(sel.schema.toString());
                     if (!sel.cond.isNull()) {
                         if (!validateCondition(sel.cond, sel, err)) return false;
                     }
@@ -180,22 +182,24 @@ public class Validator {
             }
         }
 
+
         for (ASTNode c: sel.children) {
             String a;
-            if (c.isTerminal()) {a = att.split("\\.")[1];}
-            else {
-                a = att.split(".")[1];
-                a = ((ASTSelect) c.getChild(0)).alias + "." + a;
-            }
+            if (att.contains(".")) {
+                if (c.isTerminal()) {a = att.split("\\.")[1];}
+                else {
+                    a = att.split("\\.")[1];
+                    a = ((ASTSelect) c.getChild(0)).alias + "." + a;
+                }
+            } else return false;
 
-
-            //else rep = ((ASTSelect) c.children.get(0)).alias;
             if (((ASTSelect) c).schema.containsKey(a)) {
                 if (left) cond.l_tname = ((ASTSelect) c).alias; else cond.r_tname = ((ASTSelect) c).alias;
                 if (left) cond.l_type = ((ASTSelect) c).types.get(a); else cond.r_type = ((ASTSelect) c).types.get(a);
                 return true;
             }
         }
+
         return false;
     }
 

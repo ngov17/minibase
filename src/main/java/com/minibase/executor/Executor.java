@@ -42,7 +42,7 @@ public class Executor {
                         System.out.print(o);
                         System.out.print(" | ");
                     }
-                    System.out.println("-----------");
+                    System.out.println("    -----------    ");
                 }
                 test.close();
                 continue;
@@ -50,6 +50,7 @@ public class Executor {
             try {
 
                 ASTNode node = Parser.parse(command);
+
 
 
                 switch (node.id) {

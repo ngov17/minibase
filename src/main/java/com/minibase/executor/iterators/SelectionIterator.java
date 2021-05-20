@@ -44,8 +44,9 @@ public class SelectionIterator extends Iterator {
     HashMap<String, String> types;
     HashMap<String, ArrayList<String>> aliases;
     HashMap<String, Record> tab_map;  // table/alias => Record
-    int curr_ind;   // keeps track of the current iterator
+    public int curr_ind;   // keeps track of the current iterator
     boolean has_next;
+    ArrayList<Record> r_temp = new ArrayList<>();
 
 
     /**
@@ -82,7 +83,13 @@ public class SelectionIterator extends Iterator {
     }
 
     public Record getNext () {
+        if (!r_temp.isEmpty()) {
+            Record r = r_temp.get(r_temp.size() - 1);
+            r_temp.clear();
+            return r;
+        }
         select();
+
         return project();
     }
 
@@ -94,37 +101,41 @@ public class SelectionIterator extends Iterator {
     }
 
     private void select() {
+        Record rec = null;
         if (curr_ind == -1) {return;}
         while (this.curr_ind < this.iterators.size()) {
+            if (curr_ind == -1) {return;}
             if (this.iterators.get(this.curr_ind).hasNext()) {
-
-
-                tab_map.put(this.table_names.get(this.curr_ind), this.iterators.get(this.curr_ind).getNext());
+                rec = this.iterators.get(this.curr_ind).getNext();
+                tab_map.put(this.table_names.get(this.curr_ind), rec);
                 curr_ind++;
             } else {
                 this.iterators.get(this.curr_ind).reset();
                 curr_ind--;
-                return;
+                //if (curr_ind == 0 && !this.iterators.get(curr_ind).hasNext()) {curr_ind--; tab_map.clear(); }
+
             }
         }
         // Inner most iterator
         if (curr_ind == this.iterators.size()) {
             curr_ind--;
+            while (curr_ind > 0 && !this.iterators.get(this.curr_ind).hasNext()) {
+                this.iterators.get(this.curr_ind).reset();
+                curr_ind--;
+                if (curr_ind == -1) {;return;}
+            }
 
             if (this.predicate.isNull()) {
-                if (!this.iterators.get(this.curr_ind).hasNext()) {this.iterators.get(this.curr_ind).reset();curr_ind--;}
+
+                //if (curr_ind == 0 && !this.iterators.get(curr_ind).hasNext())
+                    //if (!this.iterators.get(this.curr_ind).hasNext()) {this.iterators.get(this.curr_ind).reset();curr_ind--;}
                 return;
             }
             if (!evaluate_cond(this.predicate)) {
-                if (!this.iterators.get(this.curr_ind).hasNext()) {this.iterators.get(this.curr_ind).reset();curr_ind--;}
 
-                if (!this.hasNext()) {
-                    tab_map.clear();
-                    return;
-                }
+               // if (!this.iterators.get(this.curr_ind).hasNext()) {this.iterators.get(this.curr_ind).reset();curr_ind--;}
                 select();
             } else {
-                if (!this.iterators.get(this.curr_ind).hasNext()) {this.iterators.get(this.curr_ind).reset();curr_ind--;}
                 return;
             }
 
@@ -133,6 +144,19 @@ public class SelectionIterator extends Iterator {
     }
 
     public boolean hasNext(){
+
+        if (!this.predicate.isNull())  {
+
+                if (!r_temp.isEmpty()) return true;
+                select();
+                if (curr_ind == -1) return false;
+                else {
+                    r_temp.add(project());
+                    return true;
+                }
+
+        }
+
         if (curr_ind == 0) return this.iterators.get(curr_ind).hasNext();
         return curr_ind != -1;
     }
